@@ -30,6 +30,8 @@ export interface Expense {
   'paymentMode' : PaymentMode,
   'category' : Category,
   'amount' : Amount,
+  'paidAmount' : Amount,
+  'receiptUrl' : [] | [string],
 }
 export type ExpenseId = bigint;
 export interface ExpensePartial {
@@ -38,6 +40,8 @@ export interface ExpensePartial {
   'paymentMode' : [] | [PaymentMode],
   'category' : [] | [Category],
   'amount' : [] | [Amount],
+  'paidAmount' : [] | [Amount],
+  'receiptUrl' : [] | [string],
 }
 export type PaymentMode = { 'upi' : null } |
   { 'bank' : null } |
@@ -50,7 +54,7 @@ export type UserRole = { 'admin' : null } |
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addExpense' : ActorMethod<
-    [Date, Category, Amount, string, PaymentMode],
+    [Date, Category, Amount, string, PaymentMode, Amount, [] | [string]],
     ExpenseId
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
@@ -65,6 +69,7 @@ export interface _SERVICE {
   'getExpensesByDateRange' : ActorMethod<[Date, Date], Array<Expense>>,
   'getExpensesByPaymentMode' : ActorMethod<[PaymentMode], Array<Expense>>,
   'getTotalAmount' : ActorMethod<[], Amount>,
+  'getTotalPaidAmount' : ActorMethod<[], Amount>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,

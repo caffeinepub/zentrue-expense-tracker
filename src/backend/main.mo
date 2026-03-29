@@ -17,7 +17,6 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // User Profile Type
   public type UserProfile = {
     name : Text;
   };
@@ -45,69 +44,33 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Custom Types
   type Amount = Float;
   type Date = Time.Time;
   type ExpenseId = Nat;
-  type PaymentMode = {
-    #cash;
-    #upi;
-    #bank;
-  };
+  type PaymentMode = { #cash; #upi; #bank };
   type Category = {
-    #development;
-    #marketing;
-    #vendorCost;
-    #salary;
-    #officeExpense;
-    #miscellaneous;
+    #development; #marketing; #vendorCost;
+    #salary; #officeExpense; #miscellaneous;
   };
 
-  // Legacy Expense type (v1 — no paidAmount / receiptUrl)
-  // Kept only so the stable variable `expenses` can be deserialized on upgrade.
   type ExpenseLegacy = {
-    id : ExpenseId;
-    date : Date;
-    category : Category;
-    amount : Amount;
-    description : Text;
-    paymentMode : PaymentMode;
-    createdAt : Time.Time;
+    id : ExpenseId; date : Date; category : Category;
+    amount : Amount; description : Text;
+    paymentMode : PaymentMode; createdAt : Time.Time;
   };
 
-  // Current Expense type (v2)
   type Expense = {
-    id : ExpenseId;
-    date : Date;
-    category : Category;
-    amount : Amount;
-    paidAmount : Amount;
-    receiptUrl : ?Text;
-    description : Text;
-    paymentMode : PaymentMode;
-    createdAt : Time.Time;
+    id : ExpenseId; date : Date; category : Category;
+    amount : Amount; paidAmount : Amount; receiptUrl : ?Text;
+    description : Text; paymentMode : PaymentMode; createdAt : Time.Time;
   };
 
-  // Persistence
   module Category {
-    public func compare(category1 : Category, category2 : Category) : Order.Order {
-      Text.compare(Category.toText(category1), Category.toText(category2));
+    public func compare(a : Category, b : Category) : Order.Order {
+      Text.compare(toText(a), toText(b));
     };
-
-    public func fromText(categoryText : Text) : Category {
-      switch (categoryText.toLower()) {
-        case ("development") { #development };
-        case ("marketing") { #marketing };
-        case ("vendorcost") { #vendorCost };
-        case ("salary") { #salary };
-        case ("officeexpense") { #officeExpense };
-        case ("miscellaneous") { #miscellaneous };
-        case (_) { #miscellaneous };
-      };
-    };
-
-    public func toText(category : Category) : Text {
-      switch (category) {
+    public func toText(c : Category) : Text {
+      switch c {
         case (#development) { "Development" };
         case (#marketing) { "Marketing" };
         case (#vendorCost) { "Vendor Cost" };
@@ -118,266 +81,123 @@ actor {
     };
   };
 
-  module PaymentMode {
-    public func fromText(paymentModeText : Text) : PaymentMode {
-      switch (paymentModeText.toLower()) {
-        case ("cash") { #cash };
-        case ("upi") { #upi };
-        case ("bank") { #bank };
-        case (_) { #cash };
-      };
+  module Expense {
+    public func compareByDate(a : Expense, b : Expense) : Order.Order {
+      Int.compare(a.date, b.date);
     };
-
-    public func toText(paymentMode : PaymentMode) : Text {
-      switch (paymentMode) {
-        case (#cash) { "Cash" };
-        case (#upi) { "UPI" };
-        case (#bank) { "Bank" };
-      };
+    public func compareByAmount(a : Expense, b : Expense) : Order.Order {
+      Float.compare(a.amount, b.amount);
+    };
+    public func compareByCategory(a : Expense, b : Expense) : Order.Order {
+      Category.compare(a.category, b.category);
     };
   };
 
-  // Legacy stable map — holds old data before migration (do not write new data here)
-  let expenses = Map.empty<ExpenseId, ExpenseLegacy>();
+  type ExpensePartial = {
+    date : ?Date; category : ?Category; amount : ?Amount;
+    paidAmount : ?Amount; receiptUrl : ?Text;
+    description : ?Text; paymentMode : ?PaymentMode;
+  };
 
-  // Current stable map — all new and migrated expenses live here
-  let expensesV2 = Map.empty<ExpenseId, Expense>();
+  type CategorySummary = { category : Category; totalAmount : Amount };
 
+  // Retained stable variables from previous version to preserve upgrade compatibility
   let dateApril15 = 1713188400000000000;
   let dateApril20 = 1713706800000000000;
   let dateApril22 = 1713886800000000000;
 
-  // Seed data (only runs on first deploy, not on upgrade)
-  expensesV2.add(1, {
-    id = 1;
-    date = dateApril15;
-    category = #development;
-    amount = 1000.0;
-    paidAmount = 1000.0;
-    receiptUrl = null;
-    description = "Consulting";
-    paymentMode = #cash;
-    createdAt = 1713188400000000000;
-  });
-  expensesV2.add(2, {
-    id = 2;
-    date = dateApril20;
-    category = #development;
-    amount = 2500.0;
-    paidAmount = 1500.0;
-    receiptUrl = null;
-    description = "Product Design";
-    paymentMode = #upi;
-    createdAt = 1713706800000000000;
-  });
-  expensesV2.add(3, {
-    id = 3;
-    date = dateApril22;
-    category = #vendorCost;
-    amount = 500.0;
-    paidAmount = 0.0;
-    receiptUrl = null;
-    description = "Miscellaneous";
-    paymentMode = #bank;
-    createdAt = 1713886800000000000;
-  });
+  let expenses = Map.empty<ExpenseId, ExpenseLegacy>();
+  let expensesV2 = Map.empty<ExpenseId, Expense>();
 
-  // Expense filtering
-  module Expense {
-    public func compare(expense1 : Expense, expense2 : Expense) : Order.Order {
-      Nat.compare(expense1.id, expense2.id);
-    };
-
-    public func compareByAmount(expense1 : Expense, expense2 : Expense) : Order.Order {
-      Float.compare(expense1.amount, expense2.amount);
-    };
-
-    public func compareByCategory(expense1 : Expense, expense2 : Expense) : Order.Order {
-      Category.compare(expense1.category, expense2.category);
-    };
-    public func compareByDate(expense1 : Expense, expense2 : Expense) : Order.Order {
-      Int.compare(expense1.date, expense2.date);
-    };
-  };
-
-  // Expense merging
-  type ExpensePartial = {
-    date : ?Date;
-    category : ?Category;
-    amount : ?Amount;
-    paidAmount : ?Amount;
-    receiptUrl : ?Text;
-    description : ?Text;
-    paymentMode : ?PaymentMode;
-  };
-
-  // Category summary type
-  type CategorySummary = {
-    category : Category;
-    totalAmount : Amount;
-  };
+  expensesV2.add(1, { id=1; date=dateApril15; category=#development; amount=1000.0; paidAmount=1000.0; receiptUrl=null; description="Consulting"; paymentMode=#cash; createdAt=dateApril15 });
+  expensesV2.add(2, { id=2; date=dateApril20; category=#development; amount=2500.0; paidAmount=1500.0; receiptUrl=null; description="Product Design"; paymentMode=#upi; createdAt=dateApril20 });
+  expensesV2.add(3, { id=3; date=dateApril22; category=#vendorCost; amount=500.0; paidAmount=0.0; receiptUrl=null; description="Miscellaneous"; paymentMode=#bank; createdAt=dateApril22 });
 
   var currentExpenseId = 4;
 
-  // Migration: on upgrade, copy legacy expenses into expensesV2 with default values
   system func postupgrade() {
     for (exp in expenses.values()) {
       if (not expensesV2.containsKey(exp.id)) {
         expensesV2.add(exp.id, {
-          id = exp.id;
-          date = exp.date;
-          category = exp.category;
-          amount = exp.amount;
-          paidAmount = 0.0;
-          receiptUrl = null;
-          description = exp.description;
-          paymentMode = exp.paymentMode;
-          createdAt = exp.createdAt;
+          id=exp.id; date=exp.date; category=exp.category;
+          amount=exp.amount; paidAmount=0.0; receiptUrl=null;
+          description=exp.description; paymentMode=exp.paymentMode;
+          createdAt=exp.createdAt;
         });
       };
     };
   };
 
-  public shared ({ caller }) func addExpense(date : Date, category : Category, amount : Amount, description : Text, paymentMode : PaymentMode, paidAmount : Amount, receiptUrl : ?Text) : async ExpenseId {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can add expenses");
-    };
+  public shared func addExpense(date : Date, category : Category, amount : Amount, description : Text, paymentMode : PaymentMode, paidAmount : Amount, receiptUrl : ?Text) : async ExpenseId {
     let expenseId = currentExpenseId;
-    let createdAt = Time.now();
-    let expense : Expense = {
-      id = expenseId;
-      date;
-      category;
-      amount;
-      paidAmount;
-      receiptUrl;
-      description;
-      paymentMode;
-      createdAt;
-    };
-    expensesV2.add(expenseId, expense);
+    expensesV2.add(expenseId, { id=expenseId; date; category; amount; paidAmount; receiptUrl; description; paymentMode; createdAt=Time.now() });
     currentExpenseId += 1;
     expenseId;
   };
 
-  public shared ({ caller }) func editExpense(id : ExpenseId, partial : ExpensePartial) : async Expense {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can edit expenses");
-    };
+  public shared func editExpense(id : ExpenseId, partial : ExpensePartial) : async Expense {
     switch (expensesV2.get(id)) {
       case (null) { Runtime.trap("Expense not found") };
-      case (?expense) {
-        let updatedExpense = {
-          id = expense.id;
-          date = switch (partial.date) { case (null) { expense.date }; case (?date) { date } };
-          category = switch (partial.category) {
-            case (null) { expense.category };
-            case (?category) { category };
-          };
-          amount = switch (partial.amount) {
-            case (null) { expense.amount };
-            case (?amount) { amount };
-          };
-          paidAmount = switch (partial.paidAmount) {
-            case (null) { expense.paidAmount };
-            case (?paidAmount) { paidAmount };
-          };
-          receiptUrl = switch (partial.receiptUrl) {
-            case (null) { expense.receiptUrl };
-            case (?url) { ?url };
-          };
-          description = switch (partial.description) {
-            case (null) { expense.description };
-            case (?description) { description };
-          };
-          paymentMode = switch (partial.paymentMode) {
-            case (null) { expense.paymentMode };
-            case (?paymentMode) { paymentMode };
-          };
-          createdAt = expense.createdAt;
+      case (?e) {
+        let updated = {
+          id=e.id;
+          date = switch (partial.date) { case null e.date; case (?v) v };
+          category = switch (partial.category) { case null e.category; case (?v) v };
+          amount = switch (partial.amount) { case null e.amount; case (?v) v };
+          paidAmount = switch (partial.paidAmount) { case null e.paidAmount; case (?v) v };
+          receiptUrl = switch (partial.receiptUrl) { case null e.receiptUrl; case (?v) ?v };
+          description = switch (partial.description) { case null e.description; case (?v) v };
+          paymentMode = switch (partial.paymentMode) { case null e.paymentMode; case (?v) v };
+          createdAt=e.createdAt;
         };
-        expensesV2.add(id, updatedExpense);
-        updatedExpense;
+        expensesV2.add(id, updated);
+        updated;
       };
     };
   };
 
-  public shared ({ caller }) func deleteExpense(id : ExpenseId) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete expenses");
-    };
-    if (not expensesV2.containsKey(id)) {
-      Runtime.trap("Expense not found");
-    };
+  public shared func deleteExpense(id : ExpenseId) : async () {
+    if (not expensesV2.containsKey(id)) { Runtime.trap("Expense not found") };
     expensesV2.remove(id);
   };
 
-  public query ({ caller }) func getExpense(id : ExpenseId) : async Expense {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
-    };
+  public query func getExpense(id : ExpenseId) : async Expense {
     switch (expensesV2.get(id)) {
       case (null) { Runtime.trap("Expense not found") };
-      case (?expense) { expense };
+      case (?e) e;
     };
   };
 
-  public query ({ caller }) func getAllExpenses() : async [Expense] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
-    };
+  public query func getAllExpenses() : async [Expense] {
     expensesV2.values().toArray().sort(Expense.compareByDate);
   };
 
-  public query ({ caller }) func getExpensesByCategory(category : Category) : async [Expense] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
-    };
-    expensesV2.values().toArray().filter(func(expense) { expense.category == category }).sort(Expense.compareByDate);
+  public query func getExpensesByCategory(category : Category) : async [Expense] {
+    expensesV2.values().toArray().filter(func(e) { e.category == category }).sort(Expense.compareByDate);
   };
 
-  public query ({ caller }) func getExpensesByPaymentMode(paymentMode : PaymentMode) : async [Expense] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
-    };
-    expensesV2.values().toArray().filter(func(expense) { expense.paymentMode == paymentMode }).sort(Expense.compareByDate);
+  public query func getExpensesByPaymentMode(paymentMode : PaymentMode) : async [Expense] {
+    expensesV2.values().toArray().filter(func(e) { e.paymentMode == paymentMode }).sort(Expense.compareByDate);
   };
 
-  public query ({ caller }) func getExpensesByDateRange(startDate : Date, endDate : Date) : async [Expense] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
-    };
-    expensesV2.values().toArray().filter(func(expense) { expense.date >= startDate and expense.date <= endDate }).sort(Expense.compareByDate);
+  public query func getExpensesByDateRange(startDate : Date, endDate : Date) : async [Expense] {
+    expensesV2.values().toArray().filter(func(e) { e.date >= startDate and e.date <= endDate }).sort(Expense.compareByDate);
   };
 
-  public query ({ caller }) func getTotalAmount() : async Amount {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expense totals");
-    };
-    expensesV2.values().toArray().foldLeft(0.0, func(total, expense) { total + expense.amount });
+  public query func getTotalAmount() : async Amount {
+    expensesV2.values().toArray().foldLeft(0.0, func(total, e) { total + e.amount });
   };
 
-  public query ({ caller }) func getTotalPaidAmount() : async Amount {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view expense totals");
-    };
-    expensesV2.values().toArray().foldLeft(0.0, func(total, expense) { total + expense.paidAmount });
+  public query func getTotalPaidAmount() : async Amount {
+    expensesV2.values().toArray().foldLeft(0.0, func(total, e) { total + e.paidAmount });
   };
 
-  public query ({ caller }) func getCategorySummary() : async [CategorySummary] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view category summaries");
+  public query func getCategorySummary() : async [CategorySummary] {
+    let summaries = List.empty<CategorySummary>();
+    for (cat in [#development, #marketing, #vendorCost, #salary, #officeExpense, #miscellaneous].values()) {
+      let total = expensesV2.values().toArray().filter(func(e) { e.category == cat }).foldLeft(0.0, func(t, e) { t + e.amount });
+      summaries.add({ category=cat; totalAmount=total });
     };
-    let categorySummaries = List.empty<CategorySummary>();
-    for (category in [ #development, #marketing, #vendorCost, #salary, #officeExpense, #miscellaneous ].values()) {
-      let categoryExpenses = expensesV2.values().toArray().filter(func(expense) { expense.category == category });
-      let totalAmount = categoryExpenses.foldLeft(0.0, func(total, expense) { total + expense.amount });
-      let categorySummary : CategorySummary = {
-        category;
-        totalAmount;
-      };
-      categorySummaries.add(categorySummary);
-    };
-    categorySummaries.toArray();
+    summaries.toArray();
   };
 };

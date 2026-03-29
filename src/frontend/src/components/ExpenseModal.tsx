@@ -62,6 +62,12 @@ async function uploadReceipt(file: File): Promise<string> {
   return storageClient.getDirectURL(hash);
 }
 
+// Extract string from Candid optional [] | [string]
+function fromCandidOpt(opt: [] | [string] | undefined | null): string | null {
+  if (!opt || opt.length === 0) return null;
+  return opt[0];
+}
+
 export default function ExpenseModal({
   open,
   onClose,
@@ -93,7 +99,7 @@ export default function ExpenseModal({
       setPaidAmount(String(expense.paidAmount ?? 0));
       setDescription(expense.description);
       setPaymentMode(expense.paymentMode);
-      setExistingReceiptUrl(expense.receiptUrl ?? null);
+      setExistingReceiptUrl(fromCandidOpt(expense.receiptUrl));
     } else {
       setDate(new Date().toISOString().split("T")[0]);
       setCategory(Category.development);
@@ -170,7 +176,7 @@ export default function ExpenseModal({
             description: description.trim(),
             paymentMode,
             paidAmount: paidNum,
-            receiptUrl: finalReceiptUrl ?? undefined,
+            receiptUrl: finalReceiptUrl,
           },
         });
         toast.success("Expense updated successfully");

@@ -102,6 +102,8 @@ export interface ExpensePartial {
     paymentMode?: PaymentMode;
     category?: Category;
     amount?: Amount;
+    paidAmount?: Amount;
+    receiptUrl?: string;
 }
 export interface Expense {
     id: ExpenseId;
@@ -111,6 +113,8 @@ export interface Expense {
     paymentMode: PaymentMode;
     category: Category;
     amount: Amount;
+    paidAmount: Amount;
+    receiptUrl: [] | [string];
 }
 export type Amount = number;
 export interface UserProfile {
@@ -136,7 +140,7 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
-    addExpense(date: Date_, category: Category, amount: Amount, description: string, paymentMode: PaymentMode): Promise<ExpenseId>;
+    addExpense(date: Date_, category: Category, amount: Amount, description: string, paymentMode: PaymentMode, paidAmount: Amount, receiptUrl: [] | [string]): Promise<ExpenseId>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteExpense(id: ExpenseId): Promise<void>;
     editExpense(id: ExpenseId, partial: ExpensePartial): Promise<Expense>;
@@ -149,6 +153,7 @@ export interface backendInterface {
     getExpensesByDateRange(startDate: Date_, endDate: Date_): Promise<Array<Expense>>;
     getExpensesByPaymentMode(paymentMode: PaymentMode): Promise<Array<Expense>>;
     getTotalAmount(): Promise<Amount>;
+    getTotalPaidAmount(): Promise<Amount>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -170,17 +175,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async addExpense(arg0: Date_, arg1: Category, arg2: Amount, arg3: string, arg4: PaymentMode): Promise<ExpenseId> {
+    async addExpense(arg0: Date_, arg1: Category, arg2: Amount, arg3: string, arg4: PaymentMode, arg5: Amount, arg6: [] | [string]): Promise<ExpenseId> {
         if (this.processError) {
             try {
-                const result = await this.actor.addExpense(arg0, to_candid_Category_n1(this._uploadFile, this._downloadFile, arg1), arg2, arg3, to_candid_PaymentMode_n3(this._uploadFile, this._downloadFile, arg4));
+                const result = await this.actor.addExpense(arg0, to_candid_Category_n1(this._uploadFile, this._downloadFile, arg1), arg2, arg3, to_candid_PaymentMode_n3(this._uploadFile, this._downloadFile, arg4), arg5, arg6);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addExpense(arg0, to_candid_Category_n1(this._uploadFile, this._downloadFile, arg1), arg2, arg3, to_candid_PaymentMode_n3(this._uploadFile, this._downloadFile, arg4));
+            const result = await this.actor.addExpense(arg0, to_candid_Category_n1(this._uploadFile, this._downloadFile, arg1), arg2, arg3, to_candid_PaymentMode_n3(this._uploadFile, this._downloadFile, arg4), arg5, arg6);
             return result;
         }
     }
@@ -352,6 +357,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getTotalPaidAmount(): Promise<Amount> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getTotalPaidAmount();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getTotalPaidAmount();
+            return result;
+        }
+    }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
@@ -421,15 +440,9 @@ function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uin
     paymentMode: _PaymentMode;
     category: _Category;
     amount: _Amount;
-}): {
-    id: ExpenseId;
-    date: Date_;
-    createdAt: Time;
-    description: string;
-    paymentMode: PaymentMode;
-    category: Category;
-    amount: Amount;
-} {
+    paidAmount: _Amount;
+    receiptUrl: [] | [string];
+}): Expense {
     return {
         id: value.id,
         date: value.date,
@@ -437,7 +450,9 @@ function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uin
         description: value.description,
         paymentMode: from_candid_PaymentMode_n11(_uploadFile, _downloadFile, value.paymentMode),
         category: from_candid_Category_n13(_uploadFile, _downloadFile, value.category),
-        amount: value.amount
+        amount: value.amount,
+        paidAmount: value.paidAmount,
+        receiptUrl: value.receiptUrl,
     };
 }
 function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -503,25 +518,15 @@ function to_candid_PaymentMode_n3(_uploadFile: (file: ExternalBlob) => Promise<U
 function to_candid_UserRole_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n6(_uploadFile, _downloadFile, value);
 }
-function to_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    date?: Date_;
-    description?: string;
-    paymentMode?: PaymentMode;
-    category?: Category;
-    amount?: Amount;
-}): {
-    date: [] | [_Date];
-    description: [] | [string];
-    paymentMode: [] | [_PaymentMode];
-    category: [] | [_Category];
-    amount: [] | [_Amount];
-} {
+function to_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExpensePartial): _ExpensePartial {
     return {
-        date: value.date ? candid_some(value.date) : candid_none(),
-        description: value.description ? candid_some(value.description) : candid_none(),
-        paymentMode: value.paymentMode ? candid_some(to_candid_PaymentMode_n3(_uploadFile, _downloadFile, value.paymentMode)) : candid_none(),
-        category: value.category ? candid_some(to_candid_Category_n1(_uploadFile, _downloadFile, value.category)) : candid_none(),
-        amount: value.amount ? candid_some(value.amount) : candid_none()
+        date: value.date != null ? candid_some(value.date) : candid_none(),
+        description: value.description != null ? candid_some(value.description) : candid_none(),
+        paymentMode: value.paymentMode != null ? candid_some(to_candid_PaymentMode_n3(_uploadFile, _downloadFile, value.paymentMode)) : candid_none(),
+        category: value.category != null ? candid_some(to_candid_Category_n1(_uploadFile, _downloadFile, value.category)) : candid_none(),
+        amount: value.amount != null ? candid_some(value.amount) : candid_none(),
+        paidAmount: value.paidAmount != null ? candid_some(value.paidAmount) : candid_none(),
+        receiptUrl: value.receiptUrl != null ? candid_some(value.receiptUrl) : candid_none(),
     };
 }
 function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Category): {

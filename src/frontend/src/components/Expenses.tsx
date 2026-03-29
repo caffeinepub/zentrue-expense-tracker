@@ -51,6 +51,12 @@ import {
 } from "../lib/expenseHelpers";
 import ExpenseModal from "./ExpenseModal";
 
+// Helper to extract string from Candid optional [] | [string]
+function getReceiptUrl(opt: [] | [string] | undefined | null): string | null {
+  if (!opt || opt.length === 0) return null;
+  return opt[0];
+}
+
 export default function Expenses() {
   const { data: expenses = [], isLoading } = useAllExpenses();
   const deleteMutation = useDeleteExpense();
@@ -295,6 +301,7 @@ export default function Expenses() {
                       const remaining = Math.max(0, exp.amount - paid);
                       const isFullyPaid = paid >= exp.amount;
                       const isPartial = paid > 0 && paid < exp.amount;
+                      const receiptUrl = getReceiptUrl(exp.receiptUrl);
 
                       return (
                         <tr
@@ -361,13 +368,13 @@ export default function Expenses() {
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center justify-center gap-1">
-                              {exp.receiptUrl && (
+                              {receiptUrl && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-blue-500"
                                   onClick={() =>
-                                    window.open(exp.receiptUrl!, "_blank")
+                                    window.open(receiptUrl, "_blank")
                                   }
                                   title="View receipt"
                                   data-ocid={`expenses.secondary_button.${i + 1}`}

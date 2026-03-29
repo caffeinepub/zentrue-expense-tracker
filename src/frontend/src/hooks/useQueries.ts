@@ -1,23 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  type Expense as BaseExpense,
-  type ExpensePartial as BaseExpensePartial,
   Category,
   type CategorySummary,
+  type Expense,
   PaymentMode,
 } from "../backend";
 import { useActor } from "./useActor";
 
-// Extended types to include new fields from updated backend
-export interface Expense extends BaseExpense {
-  paidAmount: number;
-  receiptUrl: string | null;
-}
-
-export interface ExpensePartial extends BaseExpensePartial {
-  paidAmount?: number;
-  receiptUrl?: string | null;
-}
+export type { Expense };
 
 export function useAllExpenses() {
   const { actor, isFetching } = useActor();
@@ -25,8 +15,7 @@ export function useAllExpenses() {
     queryKey: ["expenses"],
     queryFn: async () => {
       if (!actor) return [];
-      const data = await actor.getAllExpenses();
-      return data as unknown as Expense[];
+      return actor.getAllExpenses();
     },
     enabled: !!actor && !isFetching,
   });
@@ -62,11 +51,7 @@ export function useTotalPaidAmount() {
     queryKey: ["totalPaidAmount"],
     queryFn: async () => {
       if (!actor) return 0;
-      const a = actor as any;
-      if (typeof a.getTotalPaidAmount === "function") {
-        return a.getTotalPaidAmount();
-      }
-      return 0;
+      return actor.getTotalPaidAmount();
     },
     enabled: !!actor && !isFetching,
   });
@@ -86,15 +71,16 @@ export function useAddExpense() {
       receiptUrl: string | null;
     }) => {
       if (!actor) throw new Error("Not connected");
-      const a = actor as any;
-      return a.addExpense(
+      const receiptUrlCandid: [] | [string] =
+        data.receiptUrl != null ? [data.receiptUrl] : [];
+      return actor.addExpense(
         data.date,
         data.category,
         data.amount,
         data.description,
         data.paymentMode,
         data.paidAmount,
-        data.receiptUrl,
+        receiptUrlCandid,
       );
     },
     onSuccess: () => {
@@ -110,9 +96,29 @@ export function useEditExpense() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { id: bigint; partial: ExpensePartial }) => {
+    mutationFn: async (data: {
+      id: bigint;
+      partial: {
+        date?: bigint | null;
+        category?: Category | null;
+        amount?: number | null;
+        description?: string | null;
+        paymentMode?: PaymentMode | null;
+        paidAmount?: number | null;
+        receiptUrl?: string | null;
+      };
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.editExpense(data.id, data.partial as BaseExpensePartial);
+      const p = data.partial;
+      return actor.editExpense(data.id, {
+        date: p.date != null ? p.date : undefined,
+        description: p.description != null ? p.description : undefined,
+        paymentMode: p.paymentMode != null ? p.paymentMode : undefined,
+        category: p.category != null ? p.category : undefined,
+        amount: p.amount != null ? p.amount : undefined,
+        paidAmount: p.paidAmount != null ? p.paidAmount : undefined,
+        receiptUrl: p.receiptUrl != null ? p.receiptUrl : undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });

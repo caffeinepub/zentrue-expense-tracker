@@ -35,6 +35,8 @@ export const ExpensePartial = IDL.Record({
   'paymentMode' : IDL.Opt(PaymentMode),
   'category' : IDL.Opt(Category),
   'amount' : IDL.Opt(Amount),
+  'paidAmount' : IDL.Opt(Amount),
+  'receiptUrl' : IDL.Opt(IDL.Text),
 });
 export const Time = IDL.Int;
 export const Expense = IDL.Record({
@@ -45,6 +47,8 @@ export const Expense = IDL.Record({
   'paymentMode' : PaymentMode,
   'category' : Category,
   'amount' : Amount,
+  'paidAmount' : Amount,
+  'receiptUrl' : IDL.Opt(IDL.Text),
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const CategorySummary = IDL.Record({
@@ -55,7 +59,7 @@ export const CategorySummary = IDL.Record({
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addExpense' : IDL.Func(
-      [Date, Category, Amount, IDL.Text, PaymentMode],
+      [Date, Category, Amount, IDL.Text, PaymentMode, Amount, IDL.Opt(IDL.Text)],
       [ExpenseId],
       [],
     ),
@@ -79,6 +83,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getTotalAmount' : IDL.Func([], [Amount], ['query']),
+  'getTotalPaidAmount' : IDL.Func([], [Amount], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -118,6 +123,8 @@ export const idlFactory = ({ IDL }) => {
     'paymentMode' : IDL.Opt(PaymentMode),
     'category' : IDL.Opt(Category),
     'amount' : IDL.Opt(Amount),
+    'paidAmount' : IDL.Opt(Amount),
+    'receiptUrl' : IDL.Opt(IDL.Text),
   });
   const Time = IDL.Int;
   const Expense = IDL.Record({
@@ -128,6 +135,8 @@ export const idlFactory = ({ IDL }) => {
     'paymentMode' : PaymentMode,
     'category' : Category,
     'amount' : Amount,
+    'paidAmount' : Amount,
+    'receiptUrl' : IDL.Opt(IDL.Text),
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const CategorySummary = IDL.Record({
@@ -138,7 +147,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addExpense' : IDL.Func(
-        [Date, Category, Amount, IDL.Text, PaymentMode],
+        [Date, Category, Amount, IDL.Text, PaymentMode, Amount, IDL.Opt(IDL.Text)],
         [ExpenseId],
         [],
       ),
@@ -166,6 +175,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getTotalAmount' : IDL.Func([], [Amount], ['query']),
+    'getTotalPaidAmount' : IDL.Func([], [Amount], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
